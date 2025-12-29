@@ -1,6 +1,6 @@
 import os
 import io
-import pandas as pd
+import pandas as pd 
 import streamlit as st
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI

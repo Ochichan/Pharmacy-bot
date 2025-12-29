@@ -2,13 +2,10 @@ import os
 import io
 import pandas as pd
 import streamlit as st
-from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import AgentExecutor
-from langchain.agents.format_scratchpad.tools import format_to_tool_messages
-from langchain.agents.output_parsers.tools import ToolsAgentOutputParser
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 # ---------------------------------------------------------
 # 0. API KEY 설정 (하드코딩)
 # ---------------------------------------------------------

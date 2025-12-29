@@ -13,7 +13,7 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 # ---------------------------------------------------------
 # ⚠️ 아래 따옴표 안에 실제 발급받은 Google API Key를 넣으세요.
 # 예: api_key = "AIzaSy..."
-api_key = "AIzaSyAdQNdhuI_Y0xvZa0uqgEC-f0JiI-3ftO8"
+api_key = st.secrets "AIzaSyAdQNdhuI_Y0xvZa0uqgEC-f0JiI-3ftO8"
 
 # ---------------------------------------------------------
 # 1. 페이지 기본 설정

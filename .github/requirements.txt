@@ -1,6 +1,0 @@
-streamlit
-langchain
-langchain-google-genai
-pandas
-openpyxl
-python-dotenv

@@ -57,7 +57,7 @@ inject_custom_css()
 @st.cache_resource
 def initialize_llm(api_key):
     return ChatGoogleGenerativeAI(
-        model="gemini-3.0-flash-exp",
+        model="gemini-2.0-flash-exp",
         api_key=api_key,
         temperature=0.3
     )

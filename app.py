@@ -31,18 +31,65 @@ st.set_page_config(
 def inject_custom_css():
     st.markdown("""
     <style>
-    .stApp { background-color: #0f172a; color: #f8fafc; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    [data-testid="stSidebar"] { background-color: #1e293b; border-radius: 20px 0 0 20px; margin-right: 10px; }
-    .stButton > button {
-        background-color: #3b82f6; color: white; border: none; border-radius: 30px;
-        padding: 10px 20px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    /* 전체 배경색과 기본 텍스트 색상 (밝게) */
+    .stApp { 
+        background-color: #0f172a; 
+        color: #ffffff !important; 
     }
-    .stButton > button:hover { background-color: #2563eb; transform: translateY(-2px); }
-    .stFileUploader { background-color: #1e293b; border: 2px dashed #475569; border-radius: 20px; padding: 30px; text-align: center; }
-    .stChatMessage { background-color: #1e293b; border-radius: 20px; padding: 15px; margin-bottom: 10px; border: 1px solid #334155; }
-    th { background-color: #334155; color: #ffffff; font-weight: bold; }
-    td { background-color: #1e293b; color: #e2e8f0; }
+    
+    /* 사이드바 글자색 */
+    [data-testid="stSidebar"] { 
+        background-color: #1e293b; 
+        color: #ffffff; 
+    }
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] h3 {
+        color: #ffffff !important;
+    }
+
+    /* 일반 문구 및 마크다운 텍스트 */
+    .stMarkdown p, .stMarkdown li {
+        color: #e2e8f0 !important;
+        font-size: 1.1rem;
+    }
+
+    /* 데이터프레임(표) 디자인 개선 */
+    .stDataFrame {
+        background-color: #ffffff;
+        border-radius: 10px;
+        padding: 5px;
+    }
+    
+    /* 표 안의 숫자가 잘 보이도록 배경은 하얗게, 글자는 검게 (대비 강화) */
+    [data-testid="stTable"] {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    /* 채팅 메시지 함 */
+    .stChatMessage { 
+        background-color: #1e293b; 
+        border-radius: 20px; 
+        padding: 15px; 
+        margin-bottom: 10px; 
+        border: 1px solid #3b82f6; 
+        color: #ffffff !important;
+    }
+
+    /* 버튼 디자인 */
+    .stButton > button {
+        background-color: #3b82f6; 
+        color: white !important; 
+        border: none; 
+        border-radius: 30px;
+        padding: 10px 20px; 
+        font-weight: bold; 
+        font-size: 1.1rem;
+    }
+    
+    /* 파일 업로더 글자색 */
+    .stFileUploader label {
+        color: #ffffff !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 

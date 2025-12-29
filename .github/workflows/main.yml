@@ -26,8 +26,8 @@ jobs:
 
     - name: Build EXE with PyInstaller
       run: |
-        pip install pyinstaller  # 혹시 모르니 여기서 한 번 더 설치를 보장합니다
-        python -m PyInstaller --onefile --noconsole app.py
+        pip install pyinstaller streamlit
+        python -m PyInstaller --onefile --noconsole --collect-all streamlit app.py
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4

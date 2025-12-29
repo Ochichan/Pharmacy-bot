@@ -14,7 +14,7 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 # ⚠️ 아래 따옴표 안에 실제 발급받은 Google API Key를 넣으세요.
 # 예: api_key = "AIzaSy..."
 import streamlit as st
-api_key = st.secrets ""GEMINI_API_KEY""
+api_key = st.secrets "GEMINI_API_KEY"
 
 # ---------------------------------------------------------
 # 1. 페이지 기본 설정

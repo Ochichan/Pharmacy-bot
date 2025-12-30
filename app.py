@@ -15,6 +15,7 @@ import io
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
+    # 로컬 테스트용 (실제 배포시에는 st.secrets를 사용하세요)
     api_key = "YOUR_API_KEY_HERE"
 
 st.set_page_config(
@@ -85,7 +86,7 @@ inject_custom_css()
 def initialize_llm(api_key):
     return ChatGoogleGenerativeAI(
         model="gemini-2.0-flash-exp",
-        api_key=api_key,
+        google_api_key=api_key, # 수정: api_key -> google_api_key 파라미터 명시
         temperature=0,
     )
 
@@ -93,6 +94,9 @@ def initialize_llm(api_key):
 def analyze_financial_data(question: str):
     """엑셀 데이터를 분석하여 질문에 답합니다. 구체적인 수치와 내역을 포함하세요."""
     try:
+        if 'df' not in st.session_state:
+            return "데이터가 로드되지 않았습니다."
+            
         df = st.session_state['df']
         selected_year = st.session_state.get('selected_year', None)
         
@@ -100,7 +104,10 @@ def analyze_financial_data(question: str):
         df['금액'] = pd.to_numeric(df['금액'], errors='coerce').fillna(0)
         
         # 해당 연도 데이터
-        df_curr = df[df['년'] == selected_year]
+        if selected_year:
+            df_curr = df[df['년'] == selected_year]
+        else:
+            df_curr = df # 연도 선택이 안된 경우 전체
         
         # 요약 생성
         income = df_curr[df_curr['대분류'] == '수입']['금액'].sum()
@@ -129,11 +136,12 @@ def analyze_financial_data(question: str):
         return context
     except Exception as e:
         return f"데이터 분석 오류: {str(e)}"
+
 # ---------------------------------------------------------
-# 3. 메인 화면 (수정본)
+# 3. 메인 화면
 # ---------------------------------------------------------
 
-# 사이드바
+# 사이드바 구성
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3022/3022709.png", width=80)
     st.title("💊 약국 비서")
@@ -148,15 +156,20 @@ with st.sidebar:
 # 메인 타이틀
 st.title("💊 엄마를 위한 약국 똑똑이 비서")
 
-# 로직 시작
+# --- [수정] 0이 출력되는 것을 방지하기 위해 로직을 명확히 분리합니다 ---
+
 if uploaded_file:
     try:
+        # 파일 로드 및 세션 상태 저장
         if 'df' not in st.session_state or st.session_state.get('file_name') != uploaded_file.name:
             df = pd.read_excel(uploaded_file)
             required_cols = ['년', '월', '대분류', '금액']
+            
+            # 필수 컬럼 확인
             if not all(col in df.columns for col in required_cols):
                 st.error(f"엑셀 파일에 다음 컬럼이 꼭 있어야 해요: {required_cols}")
                 st.stop()
+                
             st.session_state['df'] = df
             st.session_state['file_name'] = uploaded_file.name
         else:
@@ -166,19 +179,21 @@ if uploaded_file:
         
         all_years = sorted(df['년'].unique(), reverse=True)
         
-        # 데이터가 없을 경우 방어 코드
         if not all_years:
             st.warning("데이터에 '년' 정보가 없어요.")
             st.stop()
 
+        # 연도 선택
         c1, c2 = st.columns([1, 4])
         with c1:
             selected_year = st.selectbox("📅 연도 선택", all_years)
             st.session_state['selected_year'] = selected_year
         
+        # 데이터 필터링
         df_curr = df[df['년'] == selected_year]
         df_prev = df[df['년'] == (selected_year - 1)]
 
+        # 요약 데이터 생성 함수
         def create_summary(dframe):
             if dframe.empty:
                 return pd.DataFrame(columns=['수입', '고정비용', '의약품_구입비', '순수익'])
@@ -203,8 +218,7 @@ if uploaded_file:
         curr_max_month = summary_curr['순수익'].idxmax() if not summary_curr.empty else "-"
         curr_max_val = summary_curr['순수익'].max() if not summary_curr.empty else 0
 
-        # [수정 포인트 1] None 대신 빈 문자열 사용
-        delta_profit = "" 
+        delta_profit = None # 기본값 None으로 설정
         if not df_prev.empty:
             summary_prev = create_summary(df_prev)
             if not summary_prev.empty:
@@ -212,13 +226,13 @@ if uploaded_file:
                 diff = curr_profit - prev_profit
                 delta_profit = f"{diff:,.0f}원 (작년 대비)"
 
-        kpi1.metric("총 순수익", f"{curr_profit:,.0f}원", delta=delta_profit or None)
+        kpi1.metric("총 순수익", f"{curr_profit:,.0f}원", delta=delta_profit)
         kpi2.metric("월 평균 순수익", f"{curr_avg:,.0f}원")
         kpi3.metric("최고의 달 (효자달)", f"{curr_max_month}월", f"💰 {curr_max_val:,.0f}원")
 
         st.markdown("---")
 
-        # 탭 섹션
+        # 탭 섹션 (차트)
         t1, t2 = st.tabs(["📊 월별 흐름 한눈에 보기", "🍰 지출 분석"])
         
         with t1:
@@ -234,7 +248,7 @@ if uploaded_file:
                 )
                 st.altair_chart((bar + line).interactive(), use_container_width=True)
                 
-                st.caption("이 표를 엑셀로 저장하고 싶으시면 아래 버튼을 누르세요.")
+                # 엑셀 다운로드
                 buffer = io.BytesIO()
                 with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                     summary_curr.to_excel(writer, sheet_name='월별요약')
@@ -252,7 +266,6 @@ if uploaded_file:
             st.subheader("고정비용 상세 분석")
             cat_col = '중분류' if '중분류' in df.columns else ('내역' if '내역' in df.columns else None)
             
-            # [수정 포인트 2] 데이터 존재 여부 확인 후 차트 그리기
             if cat_col and not df_curr.empty:
                 pie_data = df_curr[df_curr['대분류'] == '고정비용'].groupby(cat_col)['금액'].sum().reset_index()
                 if not pie_data.empty:
@@ -276,6 +289,7 @@ if uploaded_file:
         if "messages" not in st.session_state:
             st.session_state.messages = []
 
+        # 추천 질문 버튼
         st.write("자주 묻는 질문 (버튼을 누르면 바로 답해드려요!)")
         btn_col1, btn_col2, btn_col3 = st.columns(3)
         user_input = None
@@ -287,14 +301,17 @@ if uploaded_file:
         if btn_col3.button("📊 일년 총 결산 해줘"):
             user_input = f"{selected_year}년 전체 수입과 지출을 요약해주고, 잘한 점을 칭찬해줘."
 
+        # 채팅 입력
         chat_input = st.chat_input("궁금한 내용을 입력하세요...")
         if chat_input:
             user_input = chat_input
 
+        # 이전 대화 출력
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
+        # 답변 생성
         if user_input:
             st.session_state.messages.append({"role": "user", "content": user_input})
             with st.chat_message("user"):
@@ -326,7 +343,9 @@ if uploaded_file:
         st.error(f"파일을 읽는 중 문제가 생겼어요: {e}")
 
 else:
-    # 파일 업로드 전 안내 화면
+    # ---------------------------------------------------------
+    # 4. 파일 미업로드 시 환영 화면 (여기에 0이 있었습니다!)
+    # ---------------------------------------------------------
     c1, c2 = st.columns([1, 2])
     with c1:
         st.image("https://cdn-icons-png.flaticon.com/512/3022/3022709.png", width=150)

@@ -204,10 +204,6 @@ if uploaded_file:
 
             st.divider()
 
-            st.divider()
-
-           st.divider()
-
             # 3. 차트 (수입 vs 지출 비교) 및 상세표 (세로로 배치)
             st.subheader("📊 수입 vs 지출 비교")
             if not summary_df.empty:

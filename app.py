@@ -4,7 +4,7 @@ import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 # Pandas DataFrame Agent: AI가 데이터프레임을 직접 조작하게 하는 핵심 라이브러리
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
-from langchain.agents.agent_types import AgentType
+from langchain.agents import AgentType
 import altair as alt
 
 # ---------------------------------------------------------

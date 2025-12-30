@@ -206,27 +206,42 @@ if uploaded_file:
 
             st.divider()
 
+           st.divider()
+
             # 3. 차트 (수입 vs 지출 비교) 및 상세표 (세로로 배치)
-            # 수입 vs 지출 비교 차트 영역
             st.subheader("📊 수입 vs 지출 비교")
             if not summary_df.empty:
                 # 데이터 변형 (Altair용)
                 chart_data = summary_df.melt(id_vars=['월'], value_vars=['수입', '지출'], var_name='구분', value_name='금액')
                 
-                base = alt.Chart(chart_data).encode(x=alt.X('월:O', title='월'))
-                bar = base.mark_bar(cornerRadius=5).encode(
-                    x=alt.X('구분:N', title=None, axis=None), # 그룹화
+                # 차트 설정
+                bar = alt.Chart(chart_data).mark_bar(cornerRadius=3).encode(
+                    # x축: 수입/지출 구분 (바 사이 간격을 좁히기 위해 padding 조절)
+                    x=alt.X('구분:N', title=None, axis=None, scale=alt.Scale(paddingInner=0.1)),
+                    # y축: 금액
                     y=alt.Y('금액:Q', title='금액 (원)'),
+                    # 색상: 수입(파랑), 지출(빨강)
                     color=alt.Color('구분:N', scale=alt.Scale(domain=['수입', '지출'], range=['#3b82f6', '#ef4444'])),
-                    column=alt.Column('월:O', header=alt.Header(titleOrient="bottom", labelOrient="bottom")), # 월별 그룹
+                    # 열 분할: 월별로 칸을 나눔 (spacing으로 월간 간격 조절)
+                    column=alt.Column('월:O', 
+                        header=alt.Header(titleOrient="bottom", labelOrient="bottom", labelColor='#bae6fd', titleColor='#bae6fd'), 
+                        spacing=5, # 월과 월 사이의 간격을 좁게 설정
+                        title="월"
+                    ),
                     tooltip=['월', '구분', alt.Tooltip('금액', format=',')]
-                ).properties(width=50, height=400) # 화면을 넓게 쓰므로 너비와 높이를 조금 키웠습니다
+                ).properties(
+                    width=20,  # ★ 핵심: 바 하나가 포함된 한 달의 너비를 대폭 줄임 (기존 50 -> 20)
+                    height=300 # 차트 높이 조절
+                ).configure_view(
+                    stroke=None # 테두리 제거로 더 깔끔하게
+                )
                 
-                st.altair_chart(bar, use_container_width=True)
+                # use_container_width=True를 사용하여 부모 컨테이너(화면 너비)에 맞춤
+                st.altair_chart(bar) 
             else:
                 st.info("데이터가 부족합니다.")
 
-            st.divider() # 시각적 구분을 위해 구분선 추가
+            st.divider()
 
             # 월별 상세표 영역
             st.subheader("📋 월별 상세표")

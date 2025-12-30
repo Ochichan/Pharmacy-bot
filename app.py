@@ -30,37 +30,62 @@ st.set_page_config(
 def inject_custom_css():
     st.markdown("""
     <style>
-    /* 전체 폰트 */
-    html, body, [class*="css"] {
+    /* 1. 전체 폰트 및 기본 글자 색상 (연한 하늘색) */
+    html, body, [class*="css"], .stApp {
         font-family: 'Pretendard', -apple-system, system-ui, sans-serif;
         font-size: 18px; 
+        color: #bae6fd !important; /* 연한 하늘색으로 변경 */
     }
-    .stApp { background-color: #0f172a; color: #f8fafc !important; }
-
-    /* 사이드바 */
-    [data-testid="stSidebar"] { background-color: #1e293b; border-right: 1px solid #334155; }
     
-    /* 탭 디자인 */
+    .stApp { background-color: #0f172a; }
+
+    /* 2. 사이드바 내부 글자 색상 보정 */
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: #bae6fd !important;
+    }
+
+    /* 3. 사이드바 배경 및 테두리 */
+    [data-testid="stSidebar"] { 
+        background-color: #1e293b; 
+        border-right: 1px solid #334155; 
+    }
+    
+    /* 4. 탭 디자인 */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
         height: 60px; white-space: pre-wrap; background-color: #1e293b; border-radius: 10px;
-        color: #94a3b8; font-weight: bold; border: 1px solid #334155; padding: 0 20px;
+        color: #94a3b8; /* 선택되지 않은 탭은 약간 흐리게 */
+        font-weight: bold; border: 1px solid #334155; padding: 0 20px;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #2563eb; color: white; border-color: #60a5fa;
+        background-color: #2563eb; 
+        color: #ffffff !important; /* 선택된 탭은 흰색으로 강조 */
+        border-color: #60a5fa;
     }
 
-    /* KPI 카드 */
+    /* 5. KPI 카드 (Metric) */
     div[data-testid="stMetric"] {
         background-color: #1e293b; padding: 20px; border-radius: 15px;
         border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;
     }
-    div[data-testid="stMetricValue"] { color: #60a5fa !important; font-size: 1.8rem !important; }
+    /* Metric 라벨(제목) 색상 */
+    div[data-testid="stMetricLabel"] > div {
+        color: #bae6fd !important;
+    }
+    /* Metric 수치 색상 */
+    div[data-testid="stMetricValue"] { 
+        color: #60a5fa !important; 
+        font-size: 1.8rem !important; 
+    }
 
-    /* 브리핑 박스 */
+    /* 6. 브리핑 박스 커스텀 클래스 */
     .briefing-box {
-        background-color: #1e293b; padding: 20px; border-radius: 15px;
-        border-left: 5px solid #10b981; margin-bottom: 20px;
+        background-color: #1e293b; 
+        padding: 20px; 
+        border-radius: 15px;
+        border-left: 5px solid #10b981; 
+        margin-bottom: 20px;
+        color: #bae6fd; /* 박스 내부 글자색 */
     }
     </style>
     """, unsafe_allow_html=True)

@@ -30,62 +30,37 @@ st.set_page_config(
 def inject_custom_css():
     st.markdown("""
     <style>
-    /* 1. 전체 폰트 및 기본 글자 색상 (연한 하늘색) */
-    html, body, [class*="css"], .stApp {
+    /* 전체 폰트 */
+    html, body, [class*="css"] {
         font-family: 'Pretendard', -apple-system, system-ui, sans-serif;
         font-size: 18px; 
-        color: #bae6fd !important; /* 연한 하늘색으로 변경 */
     }
-    
-    .stApp { background-color: #0f172a; }
+    .stApp { background-color: #0f172a; color: #f8fafc !important; }
 
-    /* 2. 사이드바 내부 글자 색상 보정 */
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-        color: #bae6fd !important;
-    }
-
-    /* 3. 사이드바 배경 및 테두리 */
-    [data-testid="stSidebar"] { 
-        background-color: #1e293b; 
-        border-right: 1px solid #334155; 
-    }
+    /* 사이드바 */
+    [data-testid="stSidebar"] { background-color: #1e293b; border-right: 1px solid #334155; }
     
-    /* 4. 탭 디자인 */
+    /* 탭 디자인 */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
         height: 60px; white-space: pre-wrap; background-color: #1e293b; border-radius: 10px;
-        color: #94a3b8; /* 선택되지 않은 탭은 약간 흐리게 */
-        font-weight: bold; border: 1px solid #334155; padding: 0 20px;
+        color: #94a3b8; font-weight: bold; border: 1px solid #334155; padding: 0 20px;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #2563eb; 
-        color: #ffffff !important; /* 선택된 탭은 흰색으로 강조 */
-        border-color: #60a5fa;
+        background-color: #2563eb; color: white; border-color: #60a5fa;
     }
 
-    /* 5. KPI 카드 (Metric) */
+    /* KPI 카드 */
     div[data-testid="stMetric"] {
         background-color: #1e293b; padding: 20px; border-radius: 15px;
         border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;
     }
-    /* Metric 라벨(제목) 색상 */
-    div[data-testid="stMetricLabel"] > div {
-        color: #bae6fd !important;
-    }
-    /* Metric 수치 색상 */
-    div[data-testid="stMetricValue"] { 
-        color: #60a5fa !important; 
-        font-size: 1.8rem !important; 
-    }
+    div[data-testid="stMetricValue"] { color: #60a5fa !important; font-size: 1.8rem !important; }
 
-    /* 6. 브리핑 박스 커스텀 클래스 */
+    /* 브리핑 박스 */
     .briefing-box {
-        background-color: #1e293b; 
-        padding: 20px; 
-        border-radius: 15px;
-        border-left: 5px solid #10b981; 
-        margin-bottom: 20px;
-        color: #bae6fd; /* 박스 내부 글자색 */
+        background-color: #1e293b; padding: 20px; border-radius: 15px;
+        border-left: 5px solid #10b981; margin-bottom: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -204,44 +179,47 @@ if uploaded_file:
 
             st.divider()
 
-            # 3. 차트 (수입 vs 지출 비교) — removed grid/columns logic, show sequentially
-            st.subheader("📊 수입 vs 지출 비교")
-            if not summary_df.empty:
-                # 데이터 변형 (Altair용)
-                chart_data = summary_df.melt(id_vars=['월'], value_vars=['수입', '지출'], var_name='구분', value_name='금액')
-                
-                base = alt.Chart(chart_data).encode(x=alt.X('월:O', title='월'))
-                bar = base.mark_bar(cornerRadius=5).encode(
-                    x=alt.X('구분:N', title=None, axis=None), # 그룹화
-                    y=alt.Y('금액:Q', title='금액 (원)'),
-                    color=alt.Color('구분:N', scale=alt.Scale(domain=['수입', '지출'], range=['#3b82f6', '#ef4444'])),
-                    column=alt.Column('월:O', header=alt.Header(titleOrient="bottom", labelOrient="bottom")), # 월별 그룹
-                    tooltip=['월', '구분', alt.Tooltip('금액', format=',')]
-                ).properties(width=30, height=300) # 바 너비 조절
-                 
-                st.altair_chart(bar, use_container_width=True)
-            else:
-                st.info("데이터가 부족합니다.")
-
-            # 월별 상세표 (차트 아래에 표시)
-            st.subheader("📋 월별 상세표")
-            display_cols = ['월', '수입', '지출', '순수익']
-            st.dataframe(
-                summary_df[display_cols].style.format("{:,.0f}"), 
-                use_container_width=True, 
-                height=300,
-                hide_index=True
-            )
+            # 3. 차트 (수입 vs 지출 비교)
+            col_chart, col_data = st.columns([1.5, 1])
             
-            # 📥 다운로드 버튼 추가
-            csv_buffer = io.BytesIO()
-            summary_df.to_csv(csv_buffer, index=False, encoding='utf-8-sig') # 엑셀 한글 깨짐 방지
-            st.download_button(
-                label="📥 이 표를 엑셀(CSV)로 저장하기",
-                data=csv_buffer.getvalue(),
-                file_name=f"{selected_year}_약국_요약표.csv",
-                mime="text/csv"
-            )
+            with col_chart:
+                st.subheader("📊 수입 vs 지출 비교")
+                if not summary_df.empty:
+                    # 데이터 변형 (Altair용)
+                    chart_data = summary_df.melt(id_vars=['월'], value_vars=['수입', '지출'], var_name='구분', value_name='금액')
+                    
+                    base = alt.Chart(chart_data).encode(x=alt.X('월:O', title='월'))
+                    bar = base.mark_bar(cornerRadius=5).encode(
+                        x=alt.X('구분:N', title=None, axis=None), # 그룹화
+                        y=alt.Y('금액:Q', title='금액 (원)'),
+                        color=alt.Color('구분:N', scale=alt.Scale(domain=['수입', '지출'], range=['#3b82f6', '#ef4444'])),
+                        column=alt.Column('월:O', header=alt.Header(titleOrient="bottom", labelOrient="bottom")), # 월별 그룹
+                        tooltip=['월', '구분', alt.Tooltip('금액', format=',')]
+                    ).properties(width=30, height=300) # 바 너비 조절
+                    
+                    st.altair_chart(bar)
+                else:
+                    st.info("데이터가 부족합니다.")
+
+            with col_data:
+                st.subheader("📋 월별 상세표")
+                display_cols = ['월', '수입', '지출', '순수익']
+                st.dataframe(
+                    summary_df[display_cols].style.format("{:,.0f}"), 
+                    use_container_width=True, 
+                    height=300,
+                    hide_index=True
+                )
+                
+                # 📥 다운로드 버튼 추가
+                csv_buffer = io.BytesIO()
+                summary_df.to_csv(csv_buffer, index=False, encoding='utf-8-sig') # 엑셀 한글 깨짐 방지
+                st.download_button(
+                    label="📥 이 표를 엑셀(CSV)로 저장하기",
+                    data=csv_buffer.getvalue(),
+                    file_name=f"{selected_year}_약국_요약표.csv",
+                    mime="text/csv"
+                )
 
         # === 탭 2: AI 비서 ===
         with tab2:

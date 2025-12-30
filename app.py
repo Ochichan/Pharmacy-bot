@@ -205,46 +205,46 @@ if uploaded_file:
             st.divider()
 
             # 3. 차트 (수입 vs 지출 비교)
-            col_chart, col_data = st.columns([1.5, 1])
+            #col_chart, col_data = st.columns([1.5, 1])
             
-            with col_chart:
-                st.subheader("📊 수입 vs 지출 비교")
-                if not summary_df.empty:
-                    # 데이터 변형 (Altair용)
-                    chart_data = summary_df.melt(id_vars=['월'], value_vars=['수입', '지출'], var_name='구분', value_name='금액')
-                    
-                    base = alt.Chart(chart_data).encode(x=alt.X('월:O', title='월'))
-                    bar = base.mark_bar(cornerRadius=5).encode(
-                        x=alt.X('구분:N', title=None, axis=None), # 그룹화
-                        y=alt.Y('금액:Q', title='금액 (원)'),
-                        color=alt.Color('구분:N', scale=alt.Scale(domain=['수입', '지출'], range=['#3b82f6', '#ef4444'])),
-                        column=alt.Column('월:O', header=alt.Header(titleOrient="bottom", labelOrient="bottom")), # 월별 그룹
-                        tooltip=['월', '구분', alt.Tooltip('금액', format=',')]
-                    ).properties(width=30, height=300) # 바 너비 조절
-                    
-                    st.altair_chart(bar)
-                else:
-                    st.info("데이터가 부족합니다.")
+            #with col_chart:
+              st.subheader("📊 수입 vs 지출 비교")
+              if not summary_df.empty:
+                  # 데이터 변형 (Altair용)
+                  chart_data = summary_df.melt(id_vars=['월'], value_vars=['수입', '지출'], var_name='구분', value_name='금액')
+                  
+                  base = alt.Chart(chart_data).encode(x=alt.X('월:O', title='월'))
+                  bar = base.mark_bar(cornerRadius=5).encode(
+                      x=alt.X('구분:N', title=None, axis=None), # 그룹화
+                      y=alt.Y('금액:Q', title='금액 (원)'),
+                      color=alt.Color('구분:N', scale=alt.Scale(domain=['수입', '지출'], range=['#3b82f6', '#ef4444'])),
+                      column=alt.Column('월:O', header=alt.Header(titleOrient="bottom", labelOrient="bottom")), # 월별 그룹
+                      tooltip=['월', '구분', alt.Tooltip('금액', format=',')]
+                  ).properties(width=30, height=300) # 바 너비 조절
+                   
+                  st.altair_chart(bar)
+              else:
+                  st.info("데이터가 부족합니다.")
 
-            with col_data:
-                st.subheader("📋 월별 상세표")
-                display_cols = ['월', '수입', '지출', '순수익']
-                st.dataframe(
-                    summary_df[display_cols].style.format("{:,.0f}"), 
-                    use_container_width=True, 
-                    height=300,
-                    hide_index=True
-                )
+            #with col_data:
+              st.subheader("📋 월별 상세표")
+              display_cols = ['월', '수입', '지출', '순수익']
+              st.dataframe(
+                  summary_df[display_cols].style.format("{:,.0f}"), 
+                  use_container_width=True, 
+                  height=300,
+                  hide_index=True
+              )
                 
                 # 📥 다운로드 버튼 추가
-                csv_buffer = io.BytesIO()
-                summary_df.to_csv(csv_buffer, index=False, encoding='utf-8-sig') # 엑셀 한글 깨짐 방지
-                st.download_button(
-                    label="📥 이 표를 엑셀(CSV)로 저장하기",
-                    data=csv_buffer.getvalue(),
-                    file_name=f"{selected_year}_약국_요약표.csv",
-                    mime="text/csv"
-                )
+              csv_buffer = io.BytesIO()
+              summary_df.to_csv(csv_buffer, index=False, encoding='utf-8-sig') # 엑셀 한글 깨짐 방지
+              st.download_button(
+                  label="📥 이 표를 엑셀(CSV)로 저장하기",
+                  data=csv_buffer.getvalue(),
+                  file_name=f"{selected_year}_약국_요약표.csv",
+                  mime="text/csv"
+              )
 
         # === 탭 2: AI 비서 ===
         with tab2:

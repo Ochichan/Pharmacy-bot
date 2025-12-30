@@ -6,354 +6,250 @@ from langchain_core.tools import tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents import create_tool_calling_agent
 from langchain.agents.agent import AgentExecutor
-import altair as alt
-import io
+import altair as alt  # 차트 라이브러리 추가
 
 # ---------------------------------------------------------
-# 0. API KEY 및 페이지 설정
+# 0. API KEY 설정
 # ---------------------------------------------------------
-if "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["GEMINI_API_KEY"]
-else:
-    # 로컬 테스트용 (실제 배포시에는 st.secrets를 사용하세요)
-    api_key = "YOUR_API_KEY_HERE"
+api_key = st.secrets["GEMINI_API_KEY"]
 
+# ---------------------------------------------------------
+# 1. 페이지 기본 설정
+# ---------------------------------------------------------
 st.set_page_config(
-    page_title="약국 똑똑이 비서 v3.0",
+    page_title="약국 똑똑이 비서",
     page_icon="💊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ---------------------------------------------------------
-# 1. UI 디자인 (깔끔하고 글씨 크게)
+# 2. UI 디자인 (CSS 주입 - 가독성 극대화 버전)
 # ---------------------------------------------------------
 def inject_custom_css():
     st.markdown("""
     <style>
-    /* 전체 폰트 및 배경 */
+    /* 전체 폰트 크기 상향 */
     html, body, [class*="css"] {
-        font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
-        font-size: 18px;
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+        font-size: 18px; 
     }
-    .stApp { background-color: #f8fafc; color: #1e293b; }
+    
+    .stApp { background-color: #0f172a; color: #ffffff !important; }
 
-    /* 사이드바 스타일 */
-    [data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e2e8f0; }
-    [data-testid="stSidebar"] h1 { color: #2563eb; }
+    /* 사이드바 */
+    [data-testid="stSidebar"] { background-color: #1e293b; color: #ffffff; }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+        color: #60a5fa !important; /* 사이드바 제목 하늘색 강조 */
+    }
 
-    /* KPI 카드 스타일 */
+    /* 메트릭 카드 (숫자 강조 박스) 디자인 */
     div[data-testid="stMetric"] {
-        background-color: #ffffff;
+        background-color: #1e293b;
         padding: 20px;
         border-radius: 15px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        border: 1px solid #334155;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         text-align: center;
     }
-    div[data-testid="stMetric"] label { font-size: 1.1rem; color: #64748b; }
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] { font-size: 2.2rem; font-weight: 800; color: #2563eb; }
-    div[data-testid="stMetric"] div[data-testid="stMetricDelta"] { font-size: 1.0rem; }
+    div[data-testid="stMetric"] label { color: #94a3b8 !important; font-size: 1.2rem !important; }
+    div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #3b82f6 !important; font-size: 2rem !important; font-weight: bold; }
 
-    /* 버튼 스타일 */
-    .stButton > button {
-        width: 100%;
-        border-radius: 10px;
-        height: 3em;
-        background-color: #eff6ff;
-        color: #1d4ed8;
-        border: 1px solid #bfdbfe;
-        font-weight: 600;
-    }
-    .stButton > button:hover {
-        background-color: #dbEafe;
-        border-color: #3b82f6;
-    }
+    /* 데이터프레임 */
+    .stDataFrame { background-color: #ffffff; border-radius: 10px; padding: 10px; }
+    [data-testid="stTable"] { background-color: #ffffff !important; color: #000000 !important; font-size: 1.1rem; }
 
     /* 채팅 메시지 */
-    .stChatMessage { background-color: #ffffff; border-radius: 15px; border: 1px solid #e2e8f0; }
-    [data-testid="stChatMessageAvatarUser"] { background-color: #fbbf24; }
-    [data-testid="stChatMessageAvatarAssistant"] { background-color: #3b82f6; }
+    .stChatMessage { background-color: #1e293b; border-radius: 20px; padding: 15px; margin-bottom: 10px; border: 1px solid #475569; }
+    
+    /* 버튼 */
+    .stButton > button {
+        background-color: #2563eb; color: white !important; border-radius: 30px;
+        padding: 12px 24px; font-weight: bold; font-size: 1.2rem;
+        border: 1px solid #60a5fa;
+    }
+    .stButton > button:hover { background-color: #1d4ed8; transform: scale(1.02); }
     </style>
     """, unsafe_allow_html=True)
 
 inject_custom_css()
 
 # ---------------------------------------------------------
-# 2. AI 로직 (LangChain)
+# 3. LangChain 및 로직
 # ---------------------------------------------------------
 @st.cache_resource
 def initialize_llm(api_key):
     return ChatGoogleGenerativeAI(
         model="gemini-2.0-flash-exp",
-        google_api_key=api_key, # 수정: api_key -> google_api_key 파라미터 명시
-        temperature=0,
+        api_key=api_key,
+        temperature=0.3
     )
 
 @tool
 def analyze_financial_data(question: str):
-    """엑셀 데이터를 분석하여 질문에 답합니다. 구체적인 수치와 내역을 포함하세요."""
+    """엑셀 데이터를 바탕으로 질문에 답변합니다."""
     try:
-        if 'df' not in st.session_state:
-            return "데이터가 로드되지 않았습니다."
-            
         df = st.session_state['df']
-        selected_year = st.session_state.get('selected_year', None)
-        
-        # 전처리
+        # 데이터 전처리
+        df = df.dropna(subset=['대분류', '금액'])
         df['금액'] = pd.to_numeric(df['금액'], errors='coerce').fillna(0)
         
-        # 해당 연도 데이터
-        if selected_year:
-            df_curr = df[df['년'] == selected_year]
-        else:
-            df_curr = df # 연도 선택이 안된 경우 전체
-        
-        # 요약 생성
-        income = df_curr[df_curr['대분류'] == '수입']['금액'].sum()
-        expense = df_curr[df_curr['대분류'].isin(['고정비용', '의약품_구입비'])]['금액'].sum()
-        profit = income - expense
-        
-        # 고액 지출 내역 (Top 5)
-        detail_col = next((col for col in df.columns if col in ['내역', '적요', '상세', '비고']), None)
-        top_expenses = ""
-        if detail_col:
-            top_items = df_curr[df_curr['대분류'] == '고정비용'].sort_values('금액', ascending=False).head(5)
-            for _, row in top_items.iterrows():
-                top_expenses += f"- {row['월']}월 {row[detail_col]}: {row['금액']:,.0f}원\n"
-        
-        context = f"""
-        [분석 데이터 - {selected_year}년]
-        - 총 수입: {income:,.0f}원
-        - 총 지출: {expense:,.0f}원
-        - 순수익: {profit:,.0f}원
-        
-        [주요 고정비 지출 Top 5]
-        {top_expenses if top_expenses else "상세 내역 없음"}
-        
-        사용자 질문: {question}
-        """
-        return context
+        income_df = df[df['대분류'] == '수입']
+        fixed_df = df[df['대분류'] == '고정비용']
+        drug_df = df[df['대분류'] == '의약품_구입비']
+
+        income_sum = income_df.groupby(['년', '월'])['금액'].sum()
+        fixed_sum = fixed_df.groupby(['년', '월'])['금액'].sum()
+        drug_sum = drug_df.groupby(['년', '월'])['금액'].sum()
+
+        summary = pd.concat([income_sum, fixed_sum, drug_sum], axis=1)
+        summary.columns = ['수입', '고정비용', '의약품_구입비']
+        summary = summary.fillna(0)
+        summary['순수익'] = summary['수입'] - (summary['고정비용'] + summary['의약품_구입비'])
+        summary = summary.astype(int)
+
+        return f"데이터 요약:\n{summary.to_string()}\n\n질문: {question}"
     except Exception as e:
-        return f"데이터 분석 오류: {str(e)}"
+        return f"오류 발생: {str(e)}"
 
 # ---------------------------------------------------------
-# 3. 메인 화면
+# 4. 메인 화면 구성
 # ---------------------------------------------------------
 
-# 사이드바 구성
+# 사이드바 설정
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3022/3022709.png", width=80)
+    st.image("https://cdn-icons-png.flaticon.com/512/3022/3022709.png", width=80) # 약국 아이콘 (외부 링크)
     st.title("💊 약국 비서")
     st.markdown("---")
-    uploaded_file = st.file_uploader("📂 장부 파일(Excel) 업로드", type=['xlsx'])
+    st.markdown("### ⚙️ 사용 방법")
+    st.info("1. 엑셀 파일을 업로드하세요.\n2. 왼쪽에서 원하는 연도를 선택하세요.\n3. 궁금한 점은 채팅으로 물어보세요!")
     
-    if uploaded_file:
-        st.success("파일이 연결되었습니다!")
-    else:
-        st.info("왼쪽 상단의 'Browse files'를 눌러 엑셀 파일을 올려주세요.")
+    # 파일 업로더를 사이드바로 이동 (공간 확보)
+    uploaded_file = st.file_uploader("📂 가계부 파일 업로드", type=['xlsx'])
 
-# 메인 타이틀
+# 메인 콘텐츠
 st.title("💊 엄마를 위한 약국 똑똑이 비서")
-
-# --- [수정] 0이 출력되는 것을 방지하기 위해 로직을 명확히 분리합니다 ---
 
 if uploaded_file:
     try:
-        # 파일 로드 및 세션 상태 저장
         if 'df' not in st.session_state or st.session_state.get('file_name') != uploaded_file.name:
-            df = pd.read_excel(uploaded_file)
-            required_cols = ['년', '월', '대분류', '금액']
-            
-            # 필수 컬럼 확인
-            if not all(col in df.columns for col in required_cols):
-                st.error(f"엑셀 파일에 다음 컬럼이 꼭 있어야 해요: {required_cols}")
-                st.stop()
-                
+            df = pd.read_excel(uploaded_file, sheet_name="시트1")
             st.session_state['df'] = df
             st.session_state['file_name'] = uploaded_file.name
         else:
             df = st.session_state['df']
 
+        # 데이터 전처리 (한 번만 수행)
         df['금액'] = pd.to_numeric(df['금액'], errors='coerce').fillna(0)
         
+        # --- [기능 추가 1] 연도 선택 필터 ---
         all_years = sorted(df['년'].unique(), reverse=True)
+        selected_year = st.sidebar.selectbox("📅 확인하고 싶은 연도를 선택하세요", all_years)
         
-        if not all_years:
-            st.warning("데이터에 '년' 정보가 없어요.")
-            st.stop()
+        # 선택된 연도 데이터만 필터링
+        df_year = df[df['년'] == selected_year]
 
-        # 연도 선택
-        c1, c2 = st.columns([1, 4])
-        with c1:
-            selected_year = st.selectbox("📅 연도 선택", all_years)
-            st.session_state['selected_year'] = selected_year
+        # 요약 데이터 생성
+        income_sum = df_year[df_year['대분류'] == '수입'].groupby('월')['금액'].sum()
+        fixed_sum = df_year[df_year['대분류'] == '고정비용'].groupby('월')['금액'].sum()
+        drug_sum = df_year[df_year['대분류'] == '의약품_구입비'].groupby('월')['금액'].sum()
         
-        # 데이터 필터링
-        df_curr = df[df['년'] == selected_year]
-        df_prev = df[df['년'] == (selected_year - 1)]
+        summary = pd.concat([income_sum, fixed_sum, drug_sum], axis=1)
+        summary.columns = ['수입', '고정비용', '의약품_구입비']
+        summary = summary.fillna(0)
+        summary['순수익'] = summary['수입'] - (summary['고정비용'] + summary['의약품_구입비'])
+        summary = summary.astype(int)
 
-        # 요약 데이터 생성 함수
-        def create_summary(dframe):
-            if dframe.empty:
-                return pd.DataFrame(columns=['수입', '고정비용', '의약품_구입비', '순수익'])
+        # --- [기능 추가 2] 핵심 지표 카드 (KPI) ---
+        st.markdown(f"### 🏆 {selected_year}년 핵심 요약")
+        col1, col2, col3 = st.columns(3)
+        total_profit = summary['순수익'].sum()
+        avg_profit = summary['순수익'].mean()
+        max_profit_month = summary['순수익'].idxmax()
+        
+        col1.metric("총 순수익", f"{total_profit:,}원")
+        col2.metric("월 평균 순수익", f"{int(avg_profit):,}원")
+        col3.metric("최고의 달", f"{max_profit_month}월", f"💰 {summary['순수익'].max():,}원")
+
+        st.divider()
+
+        # --- [기능 추가 3] 시각화 (차트) ---
+        col_chart, col_table = st.columns([1.2, 1]) # 차트를 조금 더 넓게
+        
+        with col_chart:
+            st.subheader("📈 월별 순수익 흐름")
+            # Altair 차트 사용 (막대 그래프 + 꺾은선)
+            chart_data = summary.reset_index() # '월'을 컬럼으로
             
-            inc = dframe[dframe['대분류'] == '수입'].groupby('월')['금액'].sum()
-            fix = dframe[dframe['대분류'] == '고정비용'].groupby('월')['금액'].sum()
-            drug = dframe[dframe['대분류'] == '의약품_구입비'].groupby('월')['금액'].sum()
+            # 막대 그래프 (순수익)
+            bar_chart = alt.Chart(chart_data).mark_bar(cornerRadiusTopLeft=10, cornerRadiusTopRight=10).encode(
+                x=alt.X('월:O', title='월'),
+                y=alt.Y('순수익:Q', title='금액 (원)'),
+                color=alt.value("#3b82f6"),
+                tooltip=['월', alt.Tooltip('순수익', format=',')]
+            ).properties(height=400)
             
-            summ = pd.concat([inc, fix, drug], axis=1).fillna(0)
-            summ.columns = ['수입', '고정비용', '의약품_구입비']
-            summ['순수익'] = summ['수입'] - (summ['고정비용'] + summ['의약품_구입비'])
-            return summ
-
-        summary_curr = create_summary(df_curr)
-        
-        # KPI 섹션
-        st.markdown(f"### 🏆 {selected_year}년 운영 성적표")
-        kpi1, kpi2, kpi3 = st.columns(3)
-
-        curr_profit = summary_curr['순수익'].sum() if not summary_curr.empty else 0
-        curr_avg = summary_curr['순수익'].mean() if not summary_curr.empty else 0
-        curr_max_month = summary_curr['순수익'].idxmax() if not summary_curr.empty else "-"
-        curr_max_val = summary_curr['순수익'].max() if not summary_curr.empty else 0
-
-        delta_profit = None # 기본값 None으로 설정
-        if not df_prev.empty:
-            summary_prev = create_summary(df_prev)
-            if not summary_prev.empty:
-                prev_profit = summary_prev['순수익'].sum()
-                diff = curr_profit - prev_profit
-                delta_profit = f"{diff:,.0f}원 (작년 대비)"
-
-        kpi1.metric("총 순수익", f"{curr_profit:,.0f}원", delta=delta_profit)
-        kpi2.metric("월 평균 순수익", f"{curr_avg:,.0f}원")
-        kpi3.metric("최고의 달 (효자달)", f"{curr_max_month}월", f"💰 {curr_max_val:,.0f}원")
-
-        st.markdown("---")
-
-        # 탭 섹션 (차트)
-        t1, t2 = st.tabs(["📊 월별 흐름 한눈에 보기", "🍰 지출 분석"])
-        
-        with t1:
-            if not summary_curr.empty:
-                chart_data = summary_curr.reset_index()
-                base = alt.Chart(chart_data).encode(x=alt.X('월:O', title='월'))
-                bar = base.mark_bar(color='#a7f3d0', cornerRadius=5).encode(
-                    y=alt.Y('수입:Q', title='금액'), tooltip=['월', alt.Tooltip('수입', format=',')]
-                )
-                line = base.mark_line(color='#ef4444', point=True).encode(
-                    y=alt.Y('의약품_구입비', title='지출(약값+고정비)'),
-                    tooltip=['월', alt.Tooltip('의약품_구입비', format=',')]
-                )
-                st.altair_chart((bar + line).interactive(), use_container_width=True)
-                
-                # 엑셀 다운로드
-                buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                    summary_curr.to_excel(writer, sheet_name='월별요약')
-                
-                st.download_button(
-                    label="📥 월별 요약표 다운로드",
-                    data=buffer,
-                    file_name=f"{selected_year}_약국요약.xlsx",
-                    mime="application/vnd.ms_excel"
-                )
-            else:
-                st.info("표시할 데이터가 없습니다.")
-
-        with t2:
-            st.subheader("고정비용 상세 분석")
-            cat_col = '중분류' if '중분류' in df.columns else ('내역' if '내역' in df.columns else None)
+            # 텍스트 레이블 (금액 표시)
+            text = bar_chart.mark_text(dy=-10, color='white').encode(
+                text=alt.Text('순수익:Q', format=',')
+            )
             
-            if cat_col and not df_curr.empty:
-                pie_data = df_curr[df_curr['대분류'] == '고정비용'].groupby(cat_col)['금액'].sum().reset_index()
-                if not pie_data.empty:
-                    pie = alt.Chart(pie_data).mark_arc(innerRadius=60).encode(
-                        theta=alt.Theta("금액", stack=True),
-                        color=alt.Color(cat_col, legend=alt.Legend(title="항목")),
-                        tooltip=[cat_col, alt.Tooltip('금액', format=',')],
-                        order=alt.Order("금액", sort="descending")
-                    )
-                    st.altair_chart(pie, use_container_width=True)
-                else:
-                     st.info("고정비용 데이터가 없습니다.")
-            else:
-                st.info("상세 내역(중분류) 정보가 없거나 데이터가 부족해요.")
+            st.altair_chart(bar_chart + text, use_container_width=True)
 
-        st.markdown("---")
+        with col_table:
+            st.subheader("📋 월별 상세 표")
+            st.dataframe(
+                summary.style.format("{:,}"), # 천단위 콤마 자동 적용
+                use_container_width=True,
+                height=400
+            )
 
-        # 채팅 섹션
+        # --- 채팅 섹션 ---
+        st.divider()
         st.subheader("💬 AI 비서에게 물어보세요")
         
         if "messages" not in st.session_state:
             st.session_state.messages = []
 
-        # 추천 질문 버튼
-        st.write("자주 묻는 질문 (버튼을 누르면 바로 답해드려요!)")
-        btn_col1, btn_col2, btn_col3 = st.columns(3)
-        user_input = None
-        
-        if btn_col1.button("💰 이번 달 순수익은?"):
-            user_input = f"{selected_year}년의 월별 순수익을 알려줘."
-        if btn_col2.button("📉 지출이 제일 큰 달은?"):
-            user_input = f"{selected_year}년 중 지출이 가장 컸던 달과 이유를 분석해줘."
-        if btn_col3.button("📊 일년 총 결산 해줘"):
-            user_input = f"{selected_year}년 전체 수입과 지출을 요약해주고, 잘한 점을 칭찬해줘."
-
-        # 채팅 입력
-        chat_input = st.chat_input("궁금한 내용을 입력하세요...")
-        if chat_input:
-            user_input = chat_input
-
-        # 이전 대화 출력
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-        # 답변 생성
-        if user_input:
-            st.session_state.messages.append({"role": "user", "content": user_input})
+        if prompt := st.chat_input("예: 8월에 지출이 왜 이렇게 많아?"):
+            st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
-                st.markdown(user_input)
+                st.markdown(prompt)
 
             with st.chat_message("assistant"):
-                container = st.empty()
-                container.markdown("장부를 분석하고 있습니다... ⏳")
+                message_placeholder = st.empty()
                 try:
                     llm = initialize_llm(api_key)
                     tools = [analyze_financial_data]
-                    prompt = ChatPromptTemplate.from_messages([
-                        ("system", "당신은 약국 운영을 돕는 따뜻하고 유능한 비서입니다. 어르신이 보기 편하게 금액에 콤마를 찍고, 중요한 내용은 **굵게** 표시하세요."),
+                    
+                    prompt_template = ChatPromptTemplate.from_messages([
+                        ("system", "당신은 상냥한 약국 회계 전문가입니다. 데이터에 기반해 친절하게 답변해주세요. 금액은 꼭 콤마를 찍어주세요."),
                         ("human", "{input}"),
                         MessagesPlaceholder(variable_name="agent_scratchpad"),
                     ])
-                    agent = create_tool_calling_agent(llm, tools, prompt)
+                    
+                    agent = create_tool_calling_agent(llm, tools, prompt_template)
                     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
-                    
-                    response = agent_executor.invoke({"input": user_input})
-                    final_ans = response['output']
-                    
-                    container.markdown(final_ans)
-                    st.session_state.messages.append({"role": "assistant", "content": final_ans})
+                    response = agent_executor.invoke({"input": prompt})
+                    full_response = response['output']
+                    message_placeholder.markdown(full_response)
                 except Exception as e:
-                    container.error(f"오류가 발생했어요: {e}")
+                    message_placeholder.markdown(f"오류가 났어요: {e}")
+            
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
 
     except Exception as e:
-        st.error(f"파일을 읽는 중 문제가 생겼어요: {e}")
-
+        st.error(f"파일을 읽는데 문제가 생겼어요: {e}")
 else:
-    # ---------------------------------------------------------
-    # 4. 파일 미업로드 시 환영 화면 (여기에 0이 있었습니다!)
-    # ---------------------------------------------------------
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        st.image("https://cdn-icons-png.flaticon.com/512/3022/3022709.png", width=150)
-    with c2:
-        st.markdown("""
-        ## 환영합니다! 👋
-        어머니, 약국 운영하시느라 정말 고생 많으셨습니다.
-        
-        **1. 왼쪽의 'Browse files' 버튼을 눌러주세요.**
-        **2. 엑셀 장부 파일을 선택하면 제가 분석해 드릴게요.**
-        """)
+    # 파일 없을 때 안내 화면
+    st.info("👈 왼쪽 사이드바에서 엑셀 파일을 올려주세요!")
+    st.markdown("""
+    ### 💡 이렇게 사용해 보세요
+    1. 왼쪽 **'Browse files'** 버튼을 눌러 파일을 선택하세요.
+    2. 파일이 열리면 **올해 순수익**을 바로 확인할 수 있어요.
+    3. 아래 채팅창에 **"가장 돈 많이 번 달이 언제야?"** 라고 물어보세요.
+    """)

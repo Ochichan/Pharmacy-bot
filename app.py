@@ -129,10 +129,11 @@ def analyze_financial_data(question: str):
         return context
     except Exception as e:
         return f"데이터 분석 오류: {str(e)}"
+# ---------------------------------------------------------
+# 3. 메인 화면 (여기를 통째로 복사해서 붙여넣으세요)
+# ---------------------------------------------------------
 
-# ---------------------------------------------------------
-# 3. 메인 화면
-# ---------------------------------------------------------
+# 사이드바 구성
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3022/3022709.png", width=80)
     st.title("💊 약국 비서")
@@ -145,14 +146,17 @@ with st.sidebar:
     else:
         st.info("왼쪽 상단의 'Browse files'를 눌러 엑셀 파일을 올려주세요.")
 
+# 메인 타이틀 출력
 st.title("💊 엄마를 위한 약국 똑똑이 비서")
 
+# --- ⚠️ 여기 있던 0을 제거했습니다! ---
+
+# 로직 시작
 if uploaded_file:
     try:
-        # 데이터 로드
+        # 데이터 로드 및 초기화
         if 'df' not in st.session_state or st.session_state.get('file_name') != uploaded_file.name:
             df = pd.read_excel(uploaded_file)
-            # 필수 컬럼 확인
             required_cols = ['년', '월', '대분류', '금액']
             if not all(col in df.columns for col in required_cols):
                 st.error(f"엑셀 파일에 다음 컬럼이 꼭 있어야 해요: {required_cols}")
@@ -162,6 +166,7 @@ if uploaded_file:
         else:
             df = st.session_state['df']
 
+        # 데이터 전처리
         df['금액'] = pd.to_numeric(df['금액'], errors='coerce').fillna(0)
 
         # 연도 선택
@@ -173,9 +178,9 @@ if uploaded_file:
         
         # 데이터 필터링
         df_curr = df[df['년'] == selected_year]
-        df_prev = df[df['년'] == (selected_year - 1)] # 작년 데이터
+        df_prev = df[df['년'] == (selected_year - 1)]
 
-        # 요약 데이터 프레임 생성
+        # 요약 함수
         def create_summary(dframe):
             inc = dframe[dframe['대분류'] == '수입'].groupby('월')['금액'].sum()
             fix = dframe[dframe['대분류'] == '고정비용'].groupby('월')['금액'].sum()
@@ -187,17 +192,15 @@ if uploaded_file:
 
         summary_curr = create_summary(df_curr)
         
-        # --- [기능 1] KPI 카드 + 전년 대비 비교(Delta) ---
+        # KPI 섹션
         st.markdown(f"### 🏆 {selected_year}년 운영 성적표")
         kpi1, kpi2, kpi3 = st.columns(3)
 
-        # 올해 수치
         curr_profit = summary_curr['순수익'].sum()
         curr_avg = summary_curr['순수익'].mean()
         curr_max_month = summary_curr['순수익'].idxmax()
         curr_max_val = summary_curr['순수익'].max()
 
-        # 작년 비교 로직
         delta_profit = None
         if not df_prev.empty:
             summary_prev = create_summary(df_prev)
@@ -211,23 +214,22 @@ if uploaded_file:
 
         st.markdown("---")
 
-        # --- [차트 섹션] ---
+        # 탭 섹션 (차트)
         t1, t2 = st.tabs(["📊 월별 흐름 한눈에 보기", "🍰 지출 분석"])
         
         with t1:
             chart_data = summary_curr.reset_index()
-            # 복합 차트: 막대(수입) + 라인(지출)
             base = alt.Chart(chart_data).encode(x=alt.X('월:O', title='월'))
             bar = base.mark_bar(color='#a7f3d0', cornerRadius=5).encode(
                 y=alt.Y('수입:Q', title='금액'), tooltip=['월', alt.Tooltip('수입', format=',')]
             )
             line = base.mark_line(color='#ef4444', point=True).encode(
-                y=alt.Y('의약품_구입비', title='지출(약값+고정비)'), # 간단히 약값 등을 지출로 표현
+                y=alt.Y('의약품_구입비', title='지출(약값+고정비)'),
                 tooltip=['월', alt.Tooltip('의약품_구입비', format=',')]
             )
             st.altair_chart((bar + line).interactive(), use_container_width=True)
             
-            # --- [기능 2] 엑셀 다운로드 버튼 ---
+            # 엑셀 다운로드
             st.caption("이 표를 엑셀로 저장하고 싶으시면 아래 버튼을 누르세요.")
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
@@ -257,14 +259,12 @@ if uploaded_file:
 
         st.markdown("---")
 
-        # --- [채팅 섹션 & 기능 3: 원클릭 버튼] ---
+        # 채팅 및 버튼 섹션
         st.subheader("💬 AI 비서에게 물어보세요")
         
-        # 채팅 기록 초기화
         if "messages" not in st.session_state:
             st.session_state.messages = []
 
-        # 원클릭 질문 버튼 (Grid layout)
         st.write("자주 묻는 질문 (버튼을 누르면 바로 답해드려요!)")
         btn_col1, btn_col2, btn_col3 = st.columns(3)
         user_input = None
@@ -276,24 +276,19 @@ if uploaded_file:
         if btn_col3.button("📊 일년 총 결산 해줘"):
             user_input = f"{selected_year}년 전체 수입과 지출을 요약해주고, 잘한 점을 칭찬해줘."
 
-        # 채팅창 입력 (사용자가 직접 타이핑 할 경우)
         chat_input = st.chat_input("궁금한 내용을 입력하세요...")
         if chat_input:
             user_input = chat_input
 
-        # 이전 대화 출력
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-        # 질문 처리 로직
         if user_input:
-            # 유저 메시지 표시
             st.session_state.messages.append({"role": "user", "content": user_input})
             with st.chat_message("user"):
                 st.markdown(user_input)
 
-            # AI 답변 생성
             with st.chat_message("assistant"):
                 container = st.empty()
                 container.markdown("장부를 분석하고 있습니다... ⏳")

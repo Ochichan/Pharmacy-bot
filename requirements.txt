@@ -1,8 +1,8 @@
 streamlit
 pandas
 openpyxl
-langchain==0.2.14
-langchain-google-genai==1.0.8
-langchain-core==0.2.35
-langchain-community==0.2.12
+langchain
+langchain-google-genai
+langchain-community
+langchain-experimental
 tabulate
